@@ -155,7 +155,7 @@ variables:
   min_brightness: "{{ min_brightness_input|float }}"
 
   trigger_is_event: "{{ trigger is defined and trigger.platform == 'event' }}"
-  skip_event: "{{ trigger_is_event and trigger.event.data.service_data|length > 1 }}"
+  skip_event: "{{ trigger_is_event and (trigger.event.data.service_data.brightness is defined or trigger.event.data.service_data.transition is defined) }}"
 
   affected_entities: >-
     {%- if skip_event -%}
@@ -206,8 +206,8 @@ variables:
   elevation: "{{ state_attr('sun.sun', 'elevation') }}"
   last_elevation: "{% if has_last %}{{ trigger.from_state.attributes.elevation }}{% else %}{{ elevation }}{% endif %}"
 
-  force_turn_on: "{{ turn_on and not rising and last_elevation != \"\" and last_elevation >= end_setting|float and elevation <= start_setting|float }}"
-  force_turn_off: "{{ turn_off and rising and last_elevation != \"\" and last_elevation <= end_rising|float and elevation >= end_rising|float }}"
+  force_turn_on: '{{ turn_on and not rising and last_elevation != "" and last_elevation >= end_setting|float and elevation <= start_setting|float }}'
+  force_turn_off: '{{ turn_off and rising and last_elevation != "" and last_elevation <= end_rising|float and elevation >= end_rising|float }}'
 
   max_elevation: "{% if rising %}{{end_rising|float}}{% else %}{{start_setting|float}}{% endif %}"
   min_elevation: "{% if rising %}{{start_rising|float}}{% else %}{{end_setting|float}}{% endif %}"
@@ -246,33 +246,33 @@ variables:
     {%- endif -%}
 
   dim_entities: >-
-      {%- set data = namespace(entities=[]) -%}
-      {%- for e in entity_list -%}
-        {%- set current_brightness = state_attr(e, 'brightness') -%}
-        {%- set is_on = states(e) == 'on' -%}
-        {%- set last_changed = (now() - states[e].last_changed) -%}
-        {%- set can_dim = state_attr(e, 'supported_features')|bitwise_and(1)|bitwise_or(not is_on) -%}
-        {#
-          Set brightness and turn on if
-            * Trigger is an event to turn on entity and it is currently off
-          OR
-            * dimming is supported by the entity AND light shall be turned on because the sun is setting (force_turn_on)
-          OR
-            * dimming is supported by the entity AND light is ON AND the current brightness differ from the new brightness
-            AND
-            * current brightness is equal to last set brightness (has not been changed by the user within the allowance)
-        #}
-        {%- if e in affected_entities -%}
-          {%- if trigger_is_event and (not is_on or (is_on and last_changed.seconds < 2)) -%}
-            {%- set data.entities = data.entities + [e] -%}
-          {%- elif can_dim and force_turn_on -%}
-            {%- set data.entities = data.entities + [e] -%}
-          {%- elif can_dim and is_on and current_brightness != brightness and (current_brightness - last_brightness)|abs <= allowance_value -%}
-            {%- set data.entities = data.entities + [e] -%}
-          {%- endif -%}
+    {%- set data = namespace(entities=[]) -%}
+    {%- for e in entity_list -%}
+      {%- set current_brightness = state_attr(e, 'brightness') -%}
+      {%- set is_on = states(e) == 'on' -%}
+      {%- set last_changed = (now() - states[e].last_changed) -%}
+      {%- set can_dim = state_attr('light.pc_lampe', 'supported_color_modes') != ['onoff'] or not is_on -%}
+      {#
+        Set brightness and turn on if
+          * Trigger is an event to turn on entity and it is currently off
+        OR
+          * dimming is supported by the entity AND light shall be turned on because the sun is setting (force_turn_on)
+        OR
+          * dimming is supported by the entity AND light is ON AND the current brightness differ from the new brightness
+          AND
+          * current brightness is equal to last set brightness (has not been changed by the user within the allowance)
+      #}
+      {%- if e in affected_entities -%}
+        {%- if trigger_is_event and (not is_on or (is_on and last_changed.seconds < 2)) -%}
+          {%- set data.entities = data.entities + [e] -%}
+        {%- elif can_dim and force_turn_on -%}
+          {%- set data.entities = data.entities + [e] -%}
+        {%- elif can_dim and is_on and current_brightness != brightness and (current_brightness - last_brightness)|abs <= allowance_value -%}
+          {%- set data.entities = data.entities + [e] -%}
         {%- endif -%}
-      {%- endfor -%}
-      {{ data.entities }}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ data.entities }}
 
   turn_off_entities: >-
     {%- if force_turn_off -%}
@@ -298,99 +298,98 @@ mode: queued
 
 action:
   - choose:
-    - conditions:
-      - condition: template
-        value_template: "{{ debugging and trigger is not defined }}"
-      sequence:
-      - service: logger.set_level
-        data:
-          homeassistant.components.blueprint.dim_lights_based_on_sun_elevation: DEBUG
-    - conditions:
-      - condition: template
-        value_template: "{{ debugging and trigger.platform == 'homeassistant' and trigger.event == 'start' }}"
-      sequence:
-      - service: logger.set_level
-        data:
-          homeassistant.components.blueprint.dim_lights_based_on_sun_elevation: DEBUG
-    default:
-    - choose:
       - conditions:
-        - condition: template
-          value_template: "{{ error_msg|length }}"
+          - condition: template
+            value_template: "{{ debugging and trigger is not defined }}"
         sequence:
-          - service: system_log.write
+          - service: logger.set_level
             data:
-              level: error
-              logger: homeassistant.components.blueprint.dim_lights_based_on_sun_elevation
-              message: "{{ error_msg }}"
-      default:
+              homeassistant.components.blueprint.dim_lights_based_on_sun_elevation: DEBUG
+      - conditions:
+          - condition: template
+            value_template: "{{ debugging and trigger.platform == 'homeassistant' and trigger.event == 'start' }}"
+        sequence:
+          - service: logger.set_level
+            data:
+              homeassistant.components.blueprint.dim_lights_based_on_sun_elevation: DEBUG
+    default:
       - choose:
-        - conditions:
-          - condition: template
-            value_template: "{{ debugging }}"
-          sequence:
-            - service: system_log.write
-              data:
-                level: debug
-                logger: homeassistant.components.blueprint.dim_lights_based_on_sun_elevation
-                message: "
-                  DEBUG:\n
-                  skip_event: {{ skip_event }}\n
-                  allowance_value: {{ allowance_value }}\n
-                  affected_entities: {{ affected_entities }}\n\n
-                  elevation: {{ elevation }} ({% if rising %}{{ start_rising ~ ', ' ~ end_rising }}{% else %}{{ start_setting ~ ', ' ~ end_setting }}{% endif %})\n
-                  {% if last_elevation != \"\" -%}last elevation: {{ last_elevation }}\n{% endif %}
-                  new brightness: {{ brightness }}\n
-                  {% if last_elevation != \"\" -%}last brightness: {{ last_brightness }}\n{% endif %}
-                  \n
-                  current_states: {{ current_states }}\n
-                  \n
-                  force_turn_on: {{ force_turn_on }}\n
-                  force_turn_off: {{ force_turn_off }}\n
-                  \n
-                  entities: {{ entity_list }}\n
-                  \n
-                  turn_on_entities: {{ turn_on_entities }}\n
-                  \n
-                  dim_entities: {{ dim_entities }}\n
-                  \n
-                  turn_off_entities: {{ turn_off_entities }}\n
-                  \n
-                  {% if trigger is defined %}Triggered by: {{ trigger.platform }}\n{% endif %}
-                  {% if trigger is defined and trigger.platform == 'state' and trigger.from_state.entity_id == 'sun.sun' -%}
-                  from: (elevation: {{ trigger.from_state.attributes.elevation }}, azimuth: {{ trigger.from_state.attributes.azimuth }})\n
-                  to:   (elevation: {{ trigger.to_state.attributes.elevation }}, azimuth: {{ trigger.to_state.attributes.azimuth }})\n
-                  {% endif %}
-                  {% if trigger is defined and trigger.platform == 'event' -%}
-                  entity_id: {{ trigger.event.data.service_data.entity_id }}\n
-                  service_data_length: {{ trigger.event.data.service_data|length }}\n
-                  complete event data: {{ trigger.event.data }}\n
-                  {% endif %}
-                  "
-        default: []
-      - choose:
-        - conditions: 
-          - condition: template
-            value_template: "{{ not skip_event and turn_off_entities|length > 0 }}"
-          sequence:
-            - service: light.turn_off
-              data:
-                entity_id: "{{ turn_off_entities }}"
-        - conditions:
-          - condition: template
-            value_template: "{{ not skip_event and turn_on_entities|length > 0 }}"
-          sequence:
-            - service: light.turn_on
-              data:
-                entity_id: "{{ turn_on_entities }}"
-        - conditions:
-          - condition: template
-            value_template: "{{ not skip_event and dim_entities|length > 0 }}"
-          sequence:
-            - service: light.turn_on
-              data:
-                entity_id: "{{ dim_entities }}"
-                brightness: "{{ brightness }}"
-                transition: "{{ transition_time }}"
-        default: []
-   
+          - conditions:
+              - condition: template
+                value_template: "{{ error_msg|length }}"
+            sequence:
+              - service: system_log.write
+                data:
+                  level: error
+                  logger: homeassistant.components.blueprint.dim_lights_based_on_sun_elevation
+                  message: "{{ error_msg }}"
+        default:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ debugging }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      level: debug
+                      logger: homeassistant.components.blueprint.dim_lights_based_on_sun_elevation
+                      message: "
+                        DEBUG:\n
+                        skip_event: {{ skip_event }}\n
+                        allowance_value: {{ allowance_value }}\n
+                        affected_entities: {{ affected_entities }}\n\n
+                        elevation: {{ elevation }} ({% if rising %}{{ start_rising ~ ', ' ~ end_rising }}{% else %}{{ start_setting ~ ', ' ~ end_setting }}{% endif %})\n
+                        {% if last_elevation != \"\" -%}last elevation: {{ last_elevation }}\n{% endif %}
+                        new brightness: {{ brightness }}\n
+                        {% if last_elevation != \"\" -%}last brightness: {{ last_brightness }}\n{% endif %}
+                        \n
+                        current_states: {{ current_states }}\n
+                        \n
+                        force_turn_on: {{ force_turn_on }}\n
+                        force_turn_off: {{ force_turn_off }}\n
+                        \n
+                        entities: {{ entity_list }}\n
+                        \n
+                        turn_on_entities: {{ turn_on_entities }}\n
+                        \n
+                        dim_entities: {{ dim_entities }}\n
+                        \n
+                        turn_off_entities: {{ turn_off_entities }}\n
+                        \n
+                        {% if trigger is defined %}Triggered by: {{ trigger.platform }}\n{% endif %}
+                        {% if trigger is defined and trigger.platform == 'state' and trigger.from_state.entity_id == 'sun.sun' -%}
+                        from: (elevation: {{ trigger.from_state.attributes.elevation }}, azimuth: {{ trigger.from_state.attributes.azimuth }})\n
+                        to:   (elevation: {{ trigger.to_state.attributes.elevation }}, azimuth: {{ trigger.to_state.attributes.azimuth }})\n
+                        {% endif %}
+                        {% if trigger is defined and trigger.platform == 'event' -%}
+                        entity_id: {{ trigger.event.data.service_data.entity_id }}\n
+                        service_data_length: {{ trigger.event.data.service_data|length }}\n
+                        complete event data: {{ trigger.event.data }}\n
+                        {% endif %}
+                        "
+            default: []
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ not skip_event and turn_off_entities|length > 0 }}"
+                sequence:
+                  - service: light.turn_off
+                    data:
+                      entity_id: "{{ turn_off_entities }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ not skip_event and turn_on_entities|length > 0 }}"
+                sequence:
+                  - service: light.turn_on
+                    data:
+                      entity_id: "{{ turn_on_entities }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ not skip_event and dim_entities|length > 0 }}"
+                sequence:
+                  - service: light.turn_on
+                    data:
+                      entity_id: "{{ dim_entities }}"
+                      brightness: "{{ brightness }}"
+                      transition: "{{ transition_time }}"
+            default: []
