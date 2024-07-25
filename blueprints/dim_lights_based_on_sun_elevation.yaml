@@ -4,7 +4,7 @@ blueprint:
     Adjust brightness of lights based on the current sun elevation.
     If force debug is enabled, you need to execute this automation manually
     or let Home Assitant restart before the change take effect.
-  source_url: https://github.com/EvTheFuture/homeassistant-blueprints/blob/master/blueprints/dim_lights_based_on_sun_elevation.yaml
+  source_url: https://github.com/paddy313/homeassistant-blueprints/blob/main/blueprints/dim_lights_based_on_sun_elevation.yaml
   domain: automation
   input:
     target_lights:
@@ -251,7 +251,7 @@ variables:
       {%- set current_brightness = state_attr(e, 'brightness') -%}
       {%- set is_on = states(e) == 'on' -%}
       {%- set last_changed = (now() - states[e].last_changed) -%}
-      {%- set can_dim = state_attr('light.pc_lampe', 'supported_color_modes') != ['onoff'] or not is_on -%}
+      {%- set can_dim = state_attr(e, 'supported_color_modes') != ['onoff'] or not is_on -%}
       {#
         Set brightness and turn on if
           * Trigger is an event to turn on entity and it is currently off
