@@ -145,7 +145,7 @@ action:
               channel: Camera
               notification_icon: mdi:cctv
               color: "#B73535"
-              alert_once: true
+              alert_once: false
               timeout: 300
               ttl: 0
               priority: high
