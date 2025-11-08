@@ -68,11 +68,11 @@ action:
   - delay:
       milliseconds: 750
 
-  - data:
+  - service: "notify.mobile_app_{{ device_attr(!input notification_device, 'name') | slugify }}"
+    data:
       title: !input notification_title
       message: !input notification_message
       data:
         image: "{{ !input image_base_url }}{{ !input snapshot_filename }}_{{ now().timestamp() | int }}.png"
-    action: notify.mobile_app_{{ device_attr(!input notification_device, 'name') | slugify }}
 
 mode: single
