@@ -2,25 +2,30 @@ blueprint:
   name: Camera Motion Detection Notification
   description: Send notifications to a mobile device when motion is detected by a camera
   domain: automation
+  source_url: https://github.com/home-assistant/blueprints
+  author: Your Name
   input:
     alarm_trigger:
       name: Alarm Trigger Boolean
-      description: Input boolean that triggers the alarm
+      description: Input boolean that triggers the alarm when motion is detected
       selector:
         entity:
-          domain: input_boolean
+          filter:
+            domain: input_boolean
     notification_device:
       name: Notification Device
-      description: Mobile device to send notifications to
+      description: Mobile device to send notifications to (requires official Home Assistant app)
       selector:
         device:
-          integration: mobile_app
+          filter:
+            integration: mobile_app
     camera_entity:
       name: Camera Entity
       description: Camera to capture snapshots
       selector:
         entity:
-          domain: camera
+          filter:
+            domain: camera
     snapshot_directory:
       name: Snapshot Directory
       description: Directory to save snapshots (e.g., /config/www)
@@ -29,7 +34,7 @@ blueprint:
       default: /config/www
     snapshot_filename:
       name: Snapshot Filename (without extension)
-      description: Filename for snapshots without .png extension
+      description: Filename prefix for snapshots
       selector:
         text:
       default: snapshot
@@ -53,26 +58,40 @@ blueprint:
       default: Motion has been detected!
 
 trigger:
-  - entity_id: !input alarm_trigger
+  - trigger: state
+    entity_id: !input alarm_trigger
     to: "on"
     from: "off"
-    trigger: state
+
+variables:
+  camera_entity: !input camera_entity
+  snapshot_directory: !input snapshot_directory
+  snapshot_filename: !input snapshot_filename
+  image_base_url: !input image_base_url
+  notification_title: !input notification_title
+  notification_message: !input notification_message
+  timestamp: "{{ now().timestamp() | int }}"
+  snapshot_file: "{{ snapshot_filename }}_{{ timestamp }}.png"
 
 action:
-  - data:
-      filename: "{{ !input snapshot_directory }}/{{ !input snapshot_filename }}_{{ now().timestamp() | int }}.png"
+  - alias: "Capture snapshot from camera"
+    action: camera.snapshot
+    data:
+      filename: "{{ snapshot_directory }}/{{ snapshot_file }}"
     target:
       entity_id: !input camera_entity
-    action: camera.snapshot
 
-  - delay:
+  - alias: "Wait for snapshot to be written"
+    delay:
       milliseconds: 750
 
-  - service: "notify.mobile_app_{{ device_attr(!input notification_device, 'name') | slugify }}"
+  - alias: "Send motion detection notification"
+    domain: mobile_app
+    type: notify
+    device_id: !input notification_device
+    title: "{{ notification_title }}"
+    message: "{{ notification_message }}"
     data:
-      title: !input notification_title
-      message: !input notification_message
-      data:
-        image: "{{ !input image_base_url }}{{ !input snapshot_filename }}_{{ now().timestamp() | int }}.png"
+      image: "{{ image_base_url }}{{ snapshot_file }}"
 
 mode: single
