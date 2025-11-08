@@ -1,6 +1,6 @@
 blueprint:
   name: Camera Motion Detection Notification
-  description: Send notifications to a mobile device when motion is detected by a camera
+  description: Send notifications to multiple mobile devices when motion is detected by a camera
   domain: automation
   source_url: https://github.com/home-assistant/blueprints
   author: Your Name
@@ -12,13 +12,14 @@ blueprint:
         entity:
           filter:
             domain: input_boolean
-    notification_device:
-      name: Notification Device
-      description: Mobile device to send notifications to (requires official Home Assistant app)
+    notification_devices:
+      name: Notification Devices
+      description: Mobile devices to send notifications to (requires official Home Assistant app)
       selector:
         device:
           filter:
             integration: mobile_app
+          multiple: true
     camera_entity:
       name: Camera Entity
       description: Camera to capture snapshots
@@ -71,38 +72,42 @@ variables:
   notification_title: !input notification_title
   notification_message: !input notification_message
   timestamp: "{{ now().timestamp() | int }}"
-  snapshot_file: "{{ snapshot_filename }}_{{ timestamp }}_{{range(0,100000) | random}}.png"
+  snapshot_file: "{{ snapshot_filename }}_{{ timestamp }}_{{ range(0, 100000) | random }}.png"
+  notification_devices: !input notification_devices
 
 action:
   - parallel:
     - alias: "Send motion detection notification without image"
-      domain: mobile_app
-      type: notify
-      device_id: !input notification_device
-      title: "{{ notification_title }}"
-      message: "{{ notification_message }}"
-      data:
-        clickAction: /lovelace-overview/uberwachung
-        tag: notification_alarm_yard
-        actions:
-          - action: URI
-            title: Home Assistant
-            uri: /dashboard-prototype/kameras
-          - action: URI
-            title: Open Instar
-            uri: app://de.instar.vision
-        group: Camera
-        channel: Camera
-        notification_icon: mdi:cctv
-        color: "#B73535"
-        alert_once: true
-        timeout: 300
-        ttl: 0
-        priority: high
+      repeat:
+        for_each: "{{ notification_devices }}"
+        sequence:
+          - domain: mobile_app
+            type: notify
+            device_id: "{{ repeat.item }}"
+            title: "{{ notification_title }}"
+            message: "{{ notification_message }}"
+            data:
+              clickAction: /lovelace-overview/uberwachung
+              tag: notification_alarm_yard
+              actions:
+                - action: URI
+                  title: Home Assistant
+                  uri: /dashboard-prototype/kameras
+                - action: URI
+                  title: Open Instar
+                  uri: app://de.instar.vision
+              group: Camera
+              channel: Camera
+              notification_icon: mdi:cctv
+              color: "#B73535"
+              alert_once: true
+              timeout: 300
+              ttl: 0
+              priority: high
     - sequence:
       - alias: "Safety delay"
         delay:
-          milliseconds: "{{range(0,2) | random * 300 | float}}"
+          milliseconds: "{{ range(0, 2) | random * 300 | float }}"
       - alias: "Capture snapshot from camera"
         action: camera.snapshot
         data:
@@ -114,30 +119,33 @@ action:
     delay:
       milliseconds: 750
 
-  - alias: "Send motion detection notification"
-    domain: mobile_app
-    type: notify
-    device_id: !input notification_device
-    title: "{{ notification_title }}"
-    message: "{{ notification_message }}"
-    data:
-      image: "{{ image_base_url }}{{ snapshot_file }}"
-      clickAction: /lovelace-overview/uberwachung
-      tag: notification_alarm_yard
-      actions:
-        - action: URI
-          title: Home Assistant
-          uri: /dashboard-prototype/kameras
-        - action: URI
-          title: Open Instar
-          uri: app://de.instar.vision
-      group: Camera
-      channel: Camera
-      notification_icon: mdi:cctv
-      color: "#B73535"
-      alert_once: true
-      timeout: 300
-      ttl: 0
-      priority: high
+  - alias: "Send motion detection notification with image"
+    repeat:
+      for_each: "{{ notification_devices }}"
+      sequence:
+        - domain: mobile_app
+          type: notify
+          device_id: "{{ repeat.item }}"
+          title: "{{ notification_title }}"
+          message: "{{ notification_message }}"
+          data:
+            image: "{{ image_base_url }}{{ snapshot_file }}"
+            clickAction: /lovelace-overview/uberwachung
+            tag: notification_alarm_yard
+            actions:
+              - action: URI
+                title: Home Assistant
+                uri: /dashboard-prototype/kameras
+              - action: URI
+                title: Open Instar
+                uri: app://de.instar.vision
+            group: Camera
+            channel: Camera
+            notification_icon: mdi:cctv
+            color: "#B73535"
+            alert_once: true
+            timeout: 300
+            ttl: 0
+            priority: high
 
 mode: single
