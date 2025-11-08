@@ -1,0 +1,72 @@
+blueprint:
+  name: Camera Motion Detection Notification
+  description: Send notifications to a mobile device when motion is detected by a camera
+  domain: automation
+  input:
+    alarm_trigger:
+      name: Alarm Trigger Boolean
+      description: Input boolean that triggers the alarm
+      selector:
+        entity:
+          domain: input_boolean
+    notification_device:
+      name: Notification Device
+      description: Mobile device to send notifications to
+      selector:
+        device:
+          integration: mobile_app
+    camera_entity:
+      name: Camera Entity
+      description: Camera to capture snapshots
+      selector:
+        entity:
+          domain: camera
+    snapshot_directory:
+      name: Snapshot Directory
+      description: Directory to save snapshots (e.g., /config/www)
+      selector:
+        text:
+      default: /config/www
+    notification_title:
+      name: Notification Title
+      description: Title for the notification
+      selector:
+        text:
+      default: Motion Detected 📸
+    notification_message:
+      name: Notification Message
+      description: Message for the notification
+      selector:
+        text:
+      default: Motion has been detected!
+    notification_image_url:
+      name: Notification Image URL
+      description: URL for the notification image
+      selector:
+        text:
+      default: ""
+
+trigger:
+  - entity_id: !input alarm_trigger
+    to: "on"
+    from: "off"
+    trigger: state
+
+action:
+  - data:
+      filename: "{{ !input snapshot_directory }}/snapshot_{{ now().timestamp() | int }}.png"
+    target:
+      entity_id: !input camera_entity
+    action: camera.snapshot
+
+  - delay:
+      milliseconds: 750
+
+  - data:
+      title: !input notification_title
+      message: !input notification_message
+      data:
+        image: !input notification_image_url
+    action: notify.mobile_app_{{ device_attr(!input notification_device, 'name') | slugify }}
+
+mode: single
