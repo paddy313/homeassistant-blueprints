@@ -102,7 +102,7 @@ action:
     - sequence:
       - alias: "Safety delay"
         delay:
-          milliseconds: "{{range(0,5) | random * 150 | float}}"
+          milliseconds: "{{range(0,2) | random * 300 | float}}"
       - alias: "Capture snapshot from camera"
         action: camera.snapshot
         data:
