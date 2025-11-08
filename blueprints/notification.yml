@@ -27,6 +27,18 @@ blueprint:
       selector:
         text:
       default: /config/www
+    snapshot_filename:
+      name: Snapshot Filename (without extension)
+      description: Filename for snapshots without .png extension
+      selector:
+        text:
+      default: snapshot
+    image_base_url:
+      name: Image Base URL
+      description: Base URL for accessing snapshots (e.g., https://home.wachter.one/local/)
+      selector:
+        text:
+      default: https://home.wachter.one/local/
     notification_title:
       name: Notification Title
       description: Title for the notification
@@ -39,12 +51,6 @@ blueprint:
       selector:
         text:
       default: Motion has been detected!
-    notification_image_url:
-      name: Notification Image URL
-      description: URL for the notification image
-      selector:
-        text:
-      default: ""
 
 trigger:
   - entity_id: !input alarm_trigger
@@ -54,7 +60,7 @@ trigger:
 
 action:
   - data:
-      filename: "{{ !input snapshot_directory }}/snapshot_{{ now().timestamp() | int }}.png"
+      filename: "{{ !input snapshot_directory }}/{{ !input snapshot_filename }}_{{ now().timestamp() | int }}.png"
     target:
       entity_id: !input camera_entity
     action: camera.snapshot
@@ -66,7 +72,7 @@ action:
       title: !input notification_title
       message: !input notification_message
       data:
-        image: !input notification_image_url
+        image: "{{ !input image_base_url }}{{ !input snapshot_filename }}_{{ now().timestamp() | int }}.png"
     action: notify.mobile_app_{{ device_attr(!input notification_device, 'name') | slugify }}
 
 mode: single
