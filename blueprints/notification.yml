@@ -99,17 +99,20 @@ action:
         timeout: 300
         ttl: 0
         priority: high
-      
-    - alias: "Capture snapshot from camera"
-      action: camera.snapshot
-      data:
-        filename: "{{ snapshot_directory }}/{{ snapshot_file }}"
-      target:
-        entity_id: !input camera_entity
+    - sequence:
+      - alias: "Safety delay"
+        delay:
+          milliseconds: 750
+      - alias: "Capture snapshot from camera"
+        action: camera.snapshot
+        data:
+          filename: "{{ snapshot_directory }}/{{ snapshot_file }}"
+        target:
+          entity_id: !input camera_entity
 
   - alias: "Wait for snapshot to be written"
     delay:
-      milliseconds: 750
+      milliseconds: {{range(0,500) | random}}
 
   - alias: "Send motion detection notification"
     domain: mobile_app
