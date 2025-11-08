@@ -74,12 +74,20 @@ variables:
   snapshot_file: "{{ snapshot_filename }}_{{ timestamp }}.png"
 
 action:
-  - alias: "Capture snapshot from camera"
-    action: camera.snapshot
-    data:
-      filename: "{{ snapshot_directory }}/{{ snapshot_file }}"
-    target:
-      entity_id: !input camera_entity
+  - parallel:
+    - alias: "Send motion detection notification without image"
+      domain: mobile_app
+      type: notify
+      device_id: !input notification_device
+      title: "{{ notification_title }}"
+      message: "{{ notification_message }}"
+      
+    - alias: "Capture snapshot from camera"
+      action: camera.snapshot
+      data:
+        filename: "{{ snapshot_directory }}/{{ snapshot_file }}"
+      target:
+        entity_id: !input camera_entity
 
   - alias: "Wait for snapshot to be written"
     delay:
