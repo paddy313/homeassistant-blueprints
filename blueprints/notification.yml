@@ -112,7 +112,7 @@ action:
 
   - alias: "Wait for snapshot to be written"
     delay:
-      milliseconds: {{range(0,500) | random}}
+      milliseconds: "{{range(0,500) | random}}"
 
   - alias: "Send motion detection notification"
     domain: mobile_app
