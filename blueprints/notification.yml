@@ -102,7 +102,7 @@ action:
     - sequence:
       - alias: "Safety delay"
         delay:
-          milliseconds: 750
+          milliseconds: {{range(2,10) | random * 50}}
       - alias: "Capture snapshot from camera"
         action: camera.snapshot
         data:
@@ -112,7 +112,7 @@ action:
 
   - alias: "Wait for snapshot to be written"
     delay:
-      milliseconds: "{{range(0,500) | random}}"
+      milliseconds: 750
 
   - alias: "Send motion detection notification"
     domain: mobile_app
