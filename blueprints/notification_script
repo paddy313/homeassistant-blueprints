@@ -1,0 +1,147 @@
+blueprint:
+  name: Camera Motion Detection Notification
+  description: Send notifications to multiple mobile devices when motion is detected by a camera
+  domain: script
+  source_url: https://github.com/home-assistant/blueprints
+  author: Your Name
+  input:
+    alarm_trigger:
+      name: Alarm Trigger Boolean
+      description: Input boolean that triggers the alarm when motion is detected
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
+    notification_devices:
+      name: Notification Devices
+      description: Mobile devices to send notifications to (requires official Home Assistant app)
+      selector:
+        device:
+          filter:
+            integration: mobile_app
+          multiple: true
+    camera_entity:
+      name: Camera Entity
+      description: Camera to capture snapshots
+      selector:
+        entity:
+          filter:
+            domain: camera
+    snapshot_directory:
+      name: Snapshot Directory
+      description: Directory to save snapshots (e.g., /config/www)
+      selector:
+        text:
+      default: /config/www
+    snapshot_filename:
+      name: Snapshot Filename (without extension)
+      description: Filename prefix for snapshots
+      selector:
+        text:
+      default: snapshot
+    image_base_url:
+      name: Image Base URL
+      description: Base URL for accessing snapshots (e.g., https://home.wachter.one/local/)
+      selector:
+        text:
+      default: https://home.wachter.one/local/
+    notification_title:
+      name: Notification Title
+      description: Title for the notification
+      selector:
+        text:
+      default: Motion Detected 📸
+    notification_message:
+      name: Notification Message
+      description: Message for the notification
+      selector:
+        text:
+      default: Motion has been detected!
+
+variables:
+  camera_entity: !input camera_entity
+  snapshot_directory: !input snapshot_directory
+  snapshot_filename: !input snapshot_filename
+  image_base_url: !input image_base_url
+  notification_title: !input notification_title
+  notification_message: !input notification_message
+  raw_device: !input notification_devices
+  timestamp: "{{ now().timestamp() | int }}"
+  snapshot_file: "{{ snapshot_filename }}_{{ timestamp }}_{{ range(0, 100000) | random }}.png"
+
+action:
+  - parallel:
+    - alias: "Send motion detection notification without image to all devices"
+      repeat:
+        for_each: "{{ raw_device }}"
+        sequence:
+          - variables:
+              input_notify_device: "{{ 'notify.mobile_app_' ~ (device_attr(repeat.item, 'name') | slugify) }}"
+          - service: "{{ input_notify_device }}"
+            data:
+              title: "{{ notification_title }}"
+              message: "{{ notification_message }}"
+              data:
+                clickAction: /lovelace-overview/uberwachung
+                tag: notification_alarm_yard
+                actions:
+                  - action: URI
+                    title: Home Assistant
+                    uri: /dashboard-prototype/kameras
+                  - action: URI
+                    title: Open Instar
+                    uri: app://de.instar.vision
+                group: Camera
+                channel: Camera
+                notification_icon: mdi:cctv
+                color: "#B73535"
+                alert_once: true
+                timeout: 300
+                ttl: 0
+                priority: high
+    - sequence:
+      - alias: "Safety delay"
+        delay:
+          milliseconds: "{{ range(0, 2) | random * 300 | float }}"
+      - alias: "Capture snapshot from camera"
+        action: camera.snapshot
+        data:
+          filename: "{{ snapshot_directory }}/{{ snapshot_file }}"
+        target:
+          entity_id: !input camera_entity
+
+  - alias: "Wait for snapshot to be written"
+    delay:
+      milliseconds: 750
+
+  - alias: "Send motion detection notification with image to all devices"
+    repeat:
+      for_each: "{{ raw_device }}"
+      sequence:
+        - variables:
+            input_notify_device: "{{ 'notify.mobile_app_' ~ (device_attr(repeat.item, 'name') | slugify) }}"
+        - service: "{{ input_notify_device }}"
+          data:
+            title: "{{ notification_title }}"
+            message: "{{ notification_message }}"
+            data:
+              image: "{{ image_base_url }}{{ snapshot_file }}"
+              clickAction: /lovelace-overview/uberwachung
+              tag: notification_alarm_yard
+              actions:
+                - action: URI
+                  title: Home Assistant
+                  uri: /dashboard-prototype/kameras
+                - action: URI
+                  title: Open Instar
+                  uri: app://de.instar.vision
+              group: Camera
+              channel: Camera
+              notification_icon: mdi:cctv
+              color: "#B73535"
+              alert_once: false
+              timeout: 300
+              ttl: 0
+              priority: high
+
+mode: single
