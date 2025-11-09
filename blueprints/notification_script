@@ -2,7 +2,7 @@ blueprint:
   name: Camera Notification Script
   description: Send notifications to multiple mobile devices with image
   domain: script
-  source_url: https://github.com/paddy313/homeassistant-blueprints/edit/main/blueprints/notification_script
+  source_url: https://github.com/home-assistant/blueprints
   author: Patrick
   input:
     notification_devices:
