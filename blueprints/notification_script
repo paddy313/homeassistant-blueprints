@@ -1,5 +1,5 @@
 blueprint:
-  name: Camera Motion Detection Notification
+  name: Camera Motion Detection Notification Script
   description: Send notifications to multiple mobile devices when motion is detected by a camera
   domain: script
   source_url: https://github.com/home-assistant/blueprints
