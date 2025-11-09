@@ -5,13 +5,6 @@ blueprint:
   source_url: https://github.com/home-assistant/blueprints
   author: Your Name
   input:
-    alarm_trigger:
-      name: Alarm Trigger Boolean
-      description: Input boolean that triggers the alarm when motion is detected
-      selector:
-        entity:
-          filter:
-            domain: input_boolean
     notification_devices:
       name: Notification Devices
       description: Mobile devices to send notifications to (requires official Home Assistant app)
@@ -102,7 +95,7 @@ action:
     - sequence:
       - alias: "Safety delay"
         delay:
-          milliseconds: "{{ range(0, 2) | random * 300 | float }}"
+          milliseconds: "{{ range(0, 2) | random * 75 | float }}"
       - alias: "Capture snapshot from camera"
         action: camera.snapshot
         data:
